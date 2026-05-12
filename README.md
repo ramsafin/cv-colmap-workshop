@@ -1,68 +1,66 @@
 # COLMAP Workshop: sparse reconstruction из видео в Docker
 
-Практический воркшоп: COLMAP в Docker, **разрежённая 3D-реконструкция** (*sparse reconstruction*) из видео через CLI (без GUI COLMAP). Подробные шаги — в каталоге [`docs/`](docs/).
-
-**Навигация:** [цель](#цель-воркшопа) · [требования](#требования-к-данным) · [структура](#структура-репозитория) · [быстрый старт](#быстрый-старт) · [маршрут](#основной-маршрут-воркшопа) · [документация](#документация-по-шагам) · [шпаргалка](#команды-в-контейнере-шпаргалка) · [проблемы](#типичные-проблемы)
+Практическое занятие по запуску **COLMAP** в **Docker** и построению **разрежённой 3D-реконструкции** сцены из видео (*sparse 3D reconstruction*) **в командной строке** (без графического интерфейса COLMAP). Подробные шаги — в каталоге [`docs/`](docs/).
 
 ---
 
 ## Цель воркшопа
 
-1. Извлечение кадров из видео (FFmpeg).
-2. Извлечение признаков SIFT в COLMAP.
-3. Поиск соответствий между кадрами.
-4. Sparse reconstruction (`mapper`).
-5. Экспорт в текстовые форматы и PLY.
-6. Разбор основных артефактов COLMAP.
+1. Извлечение кадров из видео с помощью **FFmpeg**.
+2. Извлечение признаков **SIFT** в **COLMAP**.
+3. Сопоставление кадров по признакам (*matching*).
+4. Разрежённая реконструкция командой **`mapper`**.
+5. Экспорт результатов в текстовые форматы и в **PLY**.
+6. Разбор основных артефактов **COLMAP**.
 
-В конце участник получает:
+По итогам участник получает:
 
 - кадры `frame_001.jpg`, `frame_002.jpg`, …;
-- базу `database.db`;
-- разрежённую модель COLMAP (часто `sparse/0/`);
-- текстовый экспорт и `model.ply`;
-- понимание ролей `cameras`, `images`, `points3D` и дальнейших шагов.
+- базу данных `database.db`;
+- разрежённую модель **COLMAP** (часто в каталоге `sparse/0/`);
+- текстовый экспорт и файл `model.ply`;
+- понимание назначения данных в `cameras`, `images`, `points3D` и возможных дальнейших шагов.
 
 ---
 
 ## Формат воркшопа
 
-- запуск **локально** у каждого участника;
-- все шаги в **терминале (CLI)**;
-- окружение в **Docker**;
-- вычисления на **CPU**;
-- графический интерфейс COLMAP **не используется**.
+- работа **локально** на машине каждого участника;
+- все действия — **в терминале** (интерфейс командной строки);
+- окружение — в **Docker**;
+- вычисления — **на CPU**;
+- графический интерфейс **COLMAP** **не используется**.
 
-Единый сценарий рассчитан на **Linux (Ubuntu)**, **macOS (Apple Silicon)** и **Windows** (Docker Desktop + WSL2/Ubuntu).
+**Ход занятия** одинаков для **Linux (Ubuntu)**, **macOS (Apple Silicon)** и **Windows** (Docker Desktop, **WSL2** и дистрибутив **Ubuntu** внутри WSL).
 
 ---
 
 ## Что используется
 
-| Компонент | Роль |
-|-----------|------|
+| Компонент | Назначение |
+|-----------|------------|
 | **FFmpeg** | извлечение кадров из видео |
-| **COLMAP** | признаки, matching, `mapper`, экспорт (в материалах ориентир на **3.9**; скрипты предупреждают, если версия по `colmap help` другая) |
-| **Docker / Compose** | одно и то же окружение у всех |
-| **Python 3** | опциональные задания и утилиты |
+| **COLMAP** | признаки, сопоставление (*matching*), **`mapper`**, экспорт |
+| **Docker / Compose** | одинаковое окружение у всех участников |
+| **Python 3** | дополнительные задания и вспомогательные скрипты |
 
 ---
 
 ## Требования к данным
 
-- вход: **MP4 (H.264)**;
-- сцена в основном **статична**;
-- эталонное видео **`sample.mp4`** уже в репозитории; при желании — своё видео в формате, который читает FFmpeg.
+- на входе — **MP4 (H.264)**;
+- сцена по возможности статична относительно камеры;
+- эталонное видео **`sample.mp4`** уже лежит в репозитории; при желании можно подставить **свой** ролик в формате, который поддерживает **FFmpeg**.
 
-**Рекомендации к съёмке / ролику:** достаточно текстуры и деталей, **overlap** между соседними кадрами, смена **точки обзора** (не только «чистое» вращение на месте), без сильного размытия и крупных движущихся объектов.
+**Рекомендации к съёмке и выбору ролика:** в кадре должно быть достаточно **текстуры и мелких деталей**; между соседними кадрами нужно **перекрытие** сцены (*overlap*); камера должна **менять точку съёмки**, а не только вращаться «на месте»; избегайте сильного **размытия**, пересветов и крупных **движущихся объектов** в кадре.
 
-**На воркшопе по умолчанию:** порядка **100–110** кадров (`fps=3/4` для `sample.mp4`), разрешение **960×540**, имена `frame_001.jpg`, …
+**Параметры по умолчанию на занятии:** порядка **100–110** кадров (для `sample.mp4` задаётся `fps=3/4`), разрешение **960×540**, имена файлов `frame_001.jpg`, …
 
 ---
 
 ## Структура репозитория
 
-Корень проекта монтируется в контейнер как **`/workspace`** (см. [`compose.yaml`](compose.yaml)). На диске у вас те же файлы, что и под `/workspace/...` внутри контейнера.
+Корень проекта при запуске контейнера монтируется как **`/workspace`** (см. [`compose.yaml`](compose.yaml)). Файлы в папке проекта на диске и пути вида **`/workspace/...`** внутри контейнера — это **одни и те же** данные.
 
 ```text
 cv-colmap-workshop/
@@ -91,14 +89,14 @@ cv-colmap-workshop/
 
 ### Образ
 
-**A.** Импорт из архива:
+**А.** Импорт из архива:
 
 ```bash
 docker image load -i colmap-workshop-image.tar
 docker images
 ```
 
-**B.** Сборка из репозитория:
+**Б.** Сборка из репозитория:
 
 ```bash
 docker compose build
@@ -118,7 +116,7 @@ docker compose run --rm workshop bash
 bash scripts/smoke_test.sh
 ```
 
-Скрипт проверяет наличие **`colmap`**, **`ffmpeg`**, **`python3`**, **`sqlite3`**, входного видео, каталогов данных и возможность записи в `workspace`. Справка: `bash scripts/smoke_test.sh --help`.
+Скрипт проверяет, что в системе есть **`colmap`**, **`ffmpeg`**, **`python3`**, **`sqlite3`**, что на месте входное видео и каталоги данных, и что в рабочую область можно **записывать** файлы. Справка по вызову: `bash scripts/smoke_test.sh --help`.
 
 ---
 
@@ -126,15 +124,15 @@ bash scripts/smoke_test.sh
 
 | Этап | Действие | Результат |
 |------|----------|-----------|
-| **0** | Подготовка Docker, вход в контейнер, `smoke_test.sh` | доступны `colmap`, `ffmpeg`, `python3`, `sqlite3` и каталоги данных |
-| **1** | Кадры из видео | `data/images/frame_*.jpg` |
-| **2** | `feature_extractor` | создаётся `database.db` |
-| **3** | `exhaustive_matcher` | соответствия в базе |
-| **4** | `mapper` | `data/workspace/sparse/0/` (или другой индекс) |
-| **5** | Экспорт | `data/workspace/text/`, `data/workspace/ply/model.ply` |
-| **6** | Разбор артефактов | понимание базы и текстовых файлов |
+| **0** | Подготовка **Docker**, вход в контейнер, скрипт **`smoke_test.sh`** | доступны `colmap`, `ffmpeg`, `python3`, `sqlite3` и каталоги данных |
+| **1** | Извлечение кадров из видео | файлы `data/images/frame_*.jpg` |
+| **2** | **`feature_extractor`** | создаётся `database.db` |
+| **3** | **`exhaustive_matcher`** | в базе появляются соответствия между кадрами |
+| **4** | **`mapper`** | каталог `data/workspace/sparse/0/` (или другой номер модели) |
+| **5** | Экспорт модели | каталоги `data/workspace/text/` и файл `data/workspace/ply/model.ply` |
+| **6** | Разбор артефактов | понимание устройства базы и текстовых выгрузок |
 
-Целиком пайплайн COLMAP из скриптов: `bash scripts/run_colmap_sparse.sh all` (см. [03](docs/03_colmap_features_matching.md)).
+Запустить **весь** пайплайн **COLMAP** одним скриптом: `bash scripts/run_colmap_sparse.sh all` (подробности — в [документе 03](docs/03_colmap_features_matching.md)).
 
 ---
 
@@ -142,32 +140,32 @@ bash scripts/smoke_test.sh
 
 | Файл | Содержание |
 |------|------------|
-| [docs/01_setup.md](docs/01_setup.md) | Docker, первый запуск, smoke test |
-| [docs/02_ffmpeg_frames.md](docs/02_ffmpeg_frames.md) | кадры из видео, `extract_frames.sh` |
-| [docs/03_colmap_features_matching.md](docs/03_colmap_features_matching.md) | признаки и matching, `run_colmap_sparse.sh` |
-| [docs/04_colmap_mapping.md](docs/04_colmap_mapping.md) | `mapper`, sparse-модель |
-| [docs/05_export_and_inspect.md](docs/05_export_and_inspect.md) | экспорт TXT/PLY, `database.db`, `export_model.sh`, `inspect_sqlite.sh` |
+| [docs/01_setup.md](docs/01_setup.md) | **Docker**, первый запуск, проверка окружения (*smoke test*) |
+| [docs/02_ffmpeg_frames.md](docs/02_ffmpeg_frames.md) | кадры из видео, скрипт `extract_frames.sh` |
+| [docs/03_colmap_features_matching.md](docs/03_colmap_features_matching.md) | признаки и сопоставление, скрипт `run_colmap_sparse.sh` |
+| [docs/04_colmap_mapping.md](docs/04_colmap_mapping.md) | **`mapper`**, разрежённая модель |
+| [docs/05_export_and_inspect.md](docs/05_export_and_inspect.md) | экспорт в **TXT**/**PLY**, база `database.db`, скрипты `export_model.sh` и `inspect_sqlite.sh` |
 | [docs/06_troubleshooting.md](docs/06_troubleshooting.md) | типичные сбои и диагностика |
-| [docs/07_next_steps.md](docs/07_next_steps.md) | dense, mesh, идеи развития |
+| [docs/07_next_steps.md](docs/07_next_steps.md) | плотная реконструкция, сетки, идеи для самостоятельной работы |
 
-**Скрипты и документы**
+**Соответствие скриптов и документов**
 
 | Скрипт | Документы |
-|--------|-----------|
+|----------|-----------|
 | `scripts/smoke_test.sh` | [01_setup.md](docs/01_setup.md) |
 | `scripts/extract_frames.sh` | [02_ffmpeg_frames.md](docs/02_ffmpeg_frames.md) |
 | `scripts/run_colmap_sparse.sh` | [03](docs/03_colmap_features_matching.md), [04](docs/04_colmap_mapping.md) |
 | `scripts/export_model.sh`, `scripts/inspect_sqlite.sh` | [05_export_and_inspect.md](docs/05_export_and_inspect.md) |
 
-У всех сценариев в `scripts/` есть **`--help`** и **`-h`**. У перечисленных в таблице — ещё **`--version`** и **`-v`**. Полный список опций смотрите в выводе **`bash scripts/<имя>.sh --help`** и в соответствующих файлах `docs/`.
+У всех скриптов в каталоге `scripts/` предусмотрены опции **`--help`** и **`-h`**. Для скриптов из таблицы выше доступны также **`--version`** и **`-v`**. Полный перечень параметров смотрите в выводе команды **`bash scripts/<имя>.sh --help`** и в соответствующих файлах в **`docs/`**.
 
 ---
 
 ## Команды в контейнере: шпаргалка
 
-Ниже пути вида **`/workspace/data/...`** — внутри контейнера (запускайте команды из каталога **`/workspace`**). Детали и опции скриптов — в соответствующих файлах `docs/`.
+Ниже — примеры команд с путями вида **`/workspace/data/...`**. Их нужно выполнять **из каталога `/workspace`** внутри контейнера. Пояснения к скриптам и ручным командам — в соответствующих разделах **`docs/`**.
 
-Признаки, matching и `mapper` можно выполнять через **`bash scripts/run_colmap_sparse.sh`** по режимам `features`, `matching`, `mapping` или сразу **`all`** — см. [03](docs/03_colmap_features_matching.md) и [04](docs/04_colmap_mapping.md).
+Извлечение признаков, сопоставление и **`mapper`** можно выполнять через **`bash scripts/run_colmap_sparse.sh`** в режимах `features`, `matching`, `mapping` либо одной командой **`all`** — см. [03](docs/03_colmap_features_matching.md) и [04](docs/04_colmap_mapping.md).
 
 ### 1. Кадры
 
@@ -179,7 +177,7 @@ ffmpeg -y -i /workspace/data/video/sample.mp4 \
   /workspace/data/images/frame_%03d.jpg
 ```
 
-Эквивалент: `bash scripts/extract_frames.sh` ([02](docs/02_ffmpeg_frames.md)).
+То же действие: `bash scripts/extract_frames.sh` (см. [02](docs/02_ffmpeg_frames.md)).
 
 ### 2. Признаки
 
@@ -194,9 +192,9 @@ colmap feature_extractor \
   --SiftExtraction.use_gpu 0
 ```
 
-Те же ключи, что в [`run_colmap_sparse.sh`](scripts/run_colmap_sparse.sh) в режиме **`features`**.
+Те же параметры, что задаёт [`run_colmap_sparse.sh`](scripts/run_colmap_sparse.sh) в режиме **`features`**.
 
-### 3. Matching
+### 3. Сопоставление (*matching*)
 
 ```bash
 colmap exhaustive_matcher \
@@ -205,7 +203,7 @@ colmap exhaustive_matcher \
   --SiftMatching.use_gpu 0
 ```
 
-### 4. Sparse reconstruction
+### 4. Разрежённая реконструкция
 
 ```bash
 mkdir -p /workspace/data/workspace/sparse
@@ -216,7 +214,7 @@ colmap mapper \
   --output_path /workspace/data/workspace/sparse
 ```
 
-### 5–6. Экспорт TXT и PLY
+### 5–6. Экспорт в TXT и PLY
 
 ```bash
 mkdir -p /workspace/data/workspace/text /workspace/data/workspace/ply
@@ -232,51 +230,52 @@ colmap model_converter \
   --output_type PLY
 ```
 
-Оба экспорта одной командой: **`bash scripts/export_model.sh`** ([05](docs/05_export_and_inspect.md)). База **`database.db`**: **`bash scripts/inspect_sqlite.sh`**.
+Оба экспорта подряд можно выполнить скриптом **`bash scripts/export_model.sh`** (см. [05](docs/05_export_and_inspect.md)). Для просмотра таблиц в **`database.db`** служит **`bash scripts/inspect_sqlite.sh`**.
 
 ---
 
 ## Что должно получиться
 
-После успешного прохождения шагов:
+После успешного выполнения всех шагов:
 
 | Расположение | Содержимое |
 |--------------|------------|
 | `data/images/` | `frame_001.jpg`, … |
 | `data/workspace/` | `database.db`, `sparse/0/…`, `text/…`, `ply/model.ply`, `logs/…` |
 
-Проверка: `model.ply` в просмотрщике; `cameras.txt`, `images.txt`, `points3D.txt` — смысл полей в [05](docs/05_export_and_inspect.md).
+Имеет смысл открыть `model.ply` в программе просмотра облаков точек; структуру и смысл полей в `cameras.txt`, `images.txt`, `points3D.txt` разбирают в [05](docs/05_export_and_inspect.md).
 
 ---
 
-## Опционально: похожие кадры
+## Дополнительно: похожие кадры
 
-Задание на Python: чтение кадров из `data/images/`, уменьшение размера, grayscale, попарная метрика (например, **SSIM**), поиск слишком похожих пар. Реализация — в `scripts/` или отдельном каталоге в контейнере.
+Необязательное задание на **Python**: прочитать кадры из `data/images/`, уменьшить разрешение, перевести в оттенки серого, оценить попарную схожесть (например, метрикой **SSIM**) и найти слишком похожие пары кадров. Код можно разместить в `scripts/` или в отдельной папке внутри контейнера.
 
 ---
 
 ## Что не входит в обязательную часть
 
-Подробно не разбираются: dense reconstruction, mesh, текстурирование, GUI COLMAP, локализация новых кадров, робототехника / SLAM / 3D Gaussian Splatting. Идеи продолжения — в [07_next_steps.md](docs/07_next_steps.md).
+В рамках основного занятия **подробно не рассматриваются**: плотная реконструкция (*dense reconstruction*), построение сетки (*mesh*), текстурирование, графический интерфейс **COLMAP**, локализация новых кадров, связка с робототехникой, **SLAM** и **3D Gaussian Splatting**. Куда двигаться дальше — в [07_next_steps.md](docs/07_next_steps.md).
 
 ---
 
 ## Типичные проблемы
 
-Частые причины плохой реконструкции: малый **overlap**, почти дубликаты кадров, смаз, мало текстуры, движущиеся объекты, неудачное исходное видео.
+Частые причины неудачной реконструкции: **слишком малое перекрытие** кадров (*overlap*), почти **дубликаты** кадров, **смаз**, **мало текстуры** на объектах, **движущиеся объекты** в кадре, неудачно выбранное исходное видео.
 
-Пошаговая диагностика: [docs/06_troubleshooting.md](docs/06_troubleshooting.md).
+Пошаговая диагностика — в [docs/06_troubleshooting.md](docs/06_troubleshooting.md).
 
 ---
 
 ## Замечания к платформе
 
-- **Linux (Ubuntu):** основной сценарий Docker / Compose.
-- **macOS (Apple Silicon):** Docker Desktop, сценарий на CPU.
-- **Windows:** Docker Desktop + WSL2 + Ubuntu (рекомендуется).
+- **Linux (Ubuntu):** типовой вариант — **Docker** и **Docker Compose**.
+- **macOS (Apple Silicon):** **Docker Desktop**, вычисления на **CPU**.
+- **Windows:** **Docker Desktop**, **WSL2** и **Ubuntu** внутри подсистемы (такой вариант рекомендуется).
 
 ---
 
 ## Следующие шаги
 
-Dense reconstruction, meshing, анализ поз камер, свои пайплайны, NVS / Gaussian Splatting — см. [docs/07_next_steps.md](docs/07_next_steps.md).
+Плотная реконструкция, построение сетки, анализ **положений камер**, собственные конвейеры обработки, синтез видов (**NVS**) и **Gaussian Splatting** — см. [docs/07_next_steps.md](docs/07_next_steps.md).
+. 
