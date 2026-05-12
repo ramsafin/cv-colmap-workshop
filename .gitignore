@@ -1,0 +1,9 @@
+data/video/*
+!data/video/.gitkeep
+
+data/images/*
+!data/images/.gitkeep
+
+data/workspace/*
+!data/workspace/.gitkeep
+
