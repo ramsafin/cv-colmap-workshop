@@ -41,7 +41,7 @@
 ## Что будет использоваться
 
 - **FFmpeg** — извлечение кадров из видео;
-- **COLMAP** — feature extraction, matching, sparse mapping, export;
+- **COLMAP** (в материалах ориентир на **3.9**: извлечение признаков, сопоставление, разрежённая реконструкция, экспорт; скрипты предупреждают, если `colmap help` показывает другую версию);
 - **Docker / Docker Compose** — единое окружение;
 - **Python** — для дополнительных утилит и опциональных заданий.
 
@@ -68,7 +68,7 @@
 
 ### Что делаем с видео на воркшопе?
 
-- извлекаем около **100 кадров**;
+- извлекаем порядка **100–110 кадров** (дефолт скрипта: `fps=3/4` для эталонного `sample.mp4`);
 - уменьшаем разрешение кадров до **960x540**;
 - используем имена вида `frame_001.jpg`, `frame_002.jpg`, ...
 
@@ -80,13 +80,10 @@
 cv-colmap-workshop/
 ├─ README.md
 ├─ compose.yaml
-├─ .env.example
 ├─ docker/
 │  ├─ Dockerfile
-│  ├─ Dockerfile.dev
 │  └─ entrypoint.sh
 ├─ docs/
-│  ├─ 00_overview.md
 │  ├─ 01_setup.md
 │  ├─ 02_ffmpeg_frames.md
 │  ├─ 03_colmap_features_matching.md
@@ -99,23 +96,18 @@ cv-colmap-workshop/
 │  ├─ extract_frames.sh
 │  ├─ run_colmap_sparse.sh
 │  ├─ export_model.sh
-│  ├─ inspect_sqlite.sh
-│  └─ optional_frame_similarity.py
-├─ data/
-│  ├─ video/
-│  │  └─ sample.mp4
-│  ├─ images/
-│  ├─ workspace/
-│  │  ├─ sparse/
-│  │  ├─ text/
-│  │  ├─ ply/
-│  │  └─ logs/
-│  └─ README.md
-└─ examples/
-   ├─ expected_tree.txt
-   ├─ expected_logs/
-   └─ sample_outputs/
-````
+│  └─ inspect_sqlite.sh
+└─ data/
+   ├─ video/
+   │  └─ sample.mp4
+   ├─ images/
+   ├─ workspace/
+   │  ├─ sparse/
+   │  ├─ text/
+   │  ├─ ply/
+   │  └─ logs/
+   └─ README.md
+```
 
 ---
 
@@ -125,7 +117,7 @@ cv-colmap-workshop/
 
 * импорт готового Docker image из архива **или** сборка вручную;
 * запуск контейнера;
-* проверка, что доступны `colmap`, `ffmpeg`, `python`.
+* проверка, что доступны `colmap`, `ffmpeg`, `python3`.
 
 ### Этап 1. Извлечение кадров из видео
 
@@ -153,7 +145,7 @@ cv-colmap-workshop/
 
 * запускаем `colmap exhaustive_matcher`;
 * выполняем matching для всех пар кадров;
-* получаем верефицированные соответствия.
+* получаем верифицированные соответствия.
 
 Результат:
 
@@ -229,9 +221,17 @@ Smoke test должен проверить:
 
 * наличие `colmap`;
 * наличие `ffmpeg`;
-* наличие `python`;
+* наличие `python3`;
 * наличие входного видео;
 * доступность рабочих директорий.
+
+Справка: `bash scripts/smoke_test.sh --help`.
+
+### Сценарии в `scripts/`
+
+Все воркшопные сценарии в `scripts/` поддерживают **`--help`** и **`-h`**. У **`extract_frames.sh`**, **`export_model.sh`**, **`inspect_sqlite.sh`**, **`run_colmap_sparse.sh`**, **`smoke_test.sh`** есть ещё **`--version`** / **`-v`**.
+
+Подробности по опциям — в выводе **`bash scripts/<имя>.sh --help`** и в соответствующих файлах `docs/02`–`docs/05`.
 
 ---
 
@@ -242,12 +242,14 @@ Smoke test должен проверить:
 ### 1. Извлечение кадров
 
 ```bash
-ffmpeg -i /workspace/data/video/sample.mp4 \
-  -vf "fps=1,scale=960:540" \
+ffmpeg -y -i /workspace/data/video/sample.mp4 \
+  -vf "fps=3/4,scale=960:540" \
   -q:v 2 \
   -start_number 1 \
   /workspace/data/images/frame_%03d.jpg
 ```
+
+Тот же шаг через сценарий: **`bash scripts/extract_frames.sh`** (опции: **`--help`**); подробности в **`docs/02_ffmpeg_frames.md`**.
 
 ### 2. Извлечение признаков
 
@@ -257,15 +259,20 @@ colmap feature_extractor \
   --image_path /workspace/data/images \
   --ImageReader.camera_model SIMPLE_RADIAL \
   --ImageReader.single_camera 1 \
-  --FeatureExtraction.use_gpu 0
+  --SiftExtraction.max_image_size 960 \
+  --SiftExtraction.max_num_features 2048 \
+  --SiftExtraction.use_gpu 0
 ```
+
+(Те же ключи, что в [`scripts/run_colmap_sparse.sh`](scripts/run_colmap_sparse.sh) при режиме `features`.)
 
 ### 3. Matching
 
 ```bash
 colmap exhaustive_matcher \
   --database_path /workspace/data/workspace/database.db \
-  --FeatureMatching.use_gpu 0
+  --SiftMatching.guided_matching 1 \
+  --SiftMatching.use_gpu 0
 ```
 
 ### 4. Sparse reconstruction
@@ -300,6 +307,8 @@ colmap model_converter \
   --output_path /workspace/data/workspace/ply/model.ply \
   --output_type PLY
 ```
+
+Оба экспорта (TXT и PLY) одной командой: **`bash scripts/export_model.sh`** — см. **`docs/05_export_and_inspect.md`**.
 
 ---
 
@@ -344,11 +353,7 @@ colmap model_converter \
 * grayscale,
 * SSIM как метрика схожести между двумя кадрами.
 
-Скрипт-заготовка будет находиться в:
-
-```text
-scripts/optional_frame_similarity.py
-```
+Такой скрипт можно написать самостоятельно в `scripts/` или в отдельном каталоге внутри контейнера.
 
 ---
 
@@ -371,7 +376,6 @@ scripts/optional_frame_similarity.py
 
 Подробные инструкции находятся в папке `docs/`:
 
-* `docs/00_overview.md` — краткая теория и обзор пайплайна;
 * `docs/01_setup.md` — установка и запуск Docker;
 * `docs/02_ffmpeg_frames.md` — извлечение кадров;
 * `docs/03_colmap_features_matching.md` — SIFT и matching;
@@ -379,6 +383,16 @@ scripts/optional_frame_similarity.py
 * `docs/05_export_and_inspect.md` — экспорт и разбор артефактов;
 * `docs/06_troubleshooting.md` — типичные проблемы;
 * `docs/07_next_steps.md` — что делать дальше.
+
+Соответствие основных скриптов и документов:
+
+| Скрипт | Основной документ |
+|--------|-------------------|
+| `scripts/smoke_test.sh` | `docs/01_setup.md` |
+| `scripts/extract_frames.sh` | `docs/02_ffmpeg_frames.md` |
+| `scripts/run_colmap_sparse.sh` | `docs/03_colmap_features_matching.md`, `docs/04_colmap_mapping.md` |
+| `scripts/export_model.sh` | `docs/05_export_and_inspect.md` |
+| `scripts/inspect_sqlite.sh` | `docs/05_export_and_inspect.md` |
 
 ---
 
@@ -393,13 +407,7 @@ scripts/optional_frame_similarity.py
 * движущиеся объекты (двигается не только камера, но и объекты на сцене);
 * плохой выбор исходного видео.
 
-Секция troubleshooting будет вынесена отдельно в:
-
-```text
-docs/06_troubleshooting.md
-```
-
----
+Подробный разбор типичных сбоев и пошаговая диагностика: [`docs/06_troubleshooting.md`](docs/06_troubleshooting.md).
 
 ## Замечания к платформе 
 

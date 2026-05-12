@@ -1,0 +1,12 @@
+services:
+  workshop:
+    image: colmap-workshop:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    stdin_open: true
+    tty: true
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
