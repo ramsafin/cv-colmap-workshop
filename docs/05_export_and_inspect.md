@@ -16,12 +16,6 @@
 4. При желании запустите **`inspect_sqlite.sh`** для базы.
 5. При проблемах см. [06_troubleshooting.md](06_troubleshooting.md), затем [07_next_steps.md](07_next_steps.md).
 
-## Скрипты шага: справка
-
-Сценарии **`export_model.sh`** и **`inspect_sqlite.sh`** поддерживают:
-
-* **`--help`** / **`-h`** — описание опций и примеры
-
 ## Цель этапа
 
 Вы получаете:
@@ -186,7 +180,7 @@ bash scripts/inspect_sqlite.sh /workspace/data/workspace/backup_database.db
 
 ## Критерии успеха
 
-* **`export_model.sh`** завершился с кодом **0** (без **`[FAIL]`** в stderr);
+* **`export_model.sh`** завершился без ошибок (нет **`[FAIL]`** в консоли);
 * есть каталог **`text/`** с ожидаемыми файлами;
 * есть **`ply/model.ply`** ненулевого размера;
 * вы понимаете, где искать **внутренние параметры камеры**, **позы** и **3D-точки**.
